@@ -46,6 +46,8 @@ source. They are pins: 0,2,4,12-15,25-27,32-39.
 
 // MPU registers
 #define SIGNAL_PATH_RESET  0x68
+#define CONFIG        0x1A
+#define GYRO_CONFIG        0x1B
 #define ACCEL_CONFIG       0x1C
 #define MOT_THR            0x1F  // Motion detection threshold bits [7:0]
 #define MOT_DUR            0x20  // This seems wrong // Duration counter threshold for motion interrupt generation, 1 kHz rate, LSB = 1 ms
@@ -84,24 +86,35 @@ uint8_t readByte(uint8_t address, uint8_t subAddress)
 }
 
 void setup(){
+  
+  pinMode(2, OUTPUT);
+  pinMode(0, INPUT);
+  digitalWrite(2, digitalRead(4));
+  
+  
+  if (digitalRead(4)) {
+    NowMesh.begin(6, true); //Channel = 6, SendOnly = true
+    NowMesh.send("FF:FF:FF:FF:FF:FF", (uint8_t*)"ALARM ACTIVATED", 16);
+  }
 //  Serial.begin(115200);
 //  delay(50);
 //
 //  Serial.println("UP");
   writeByte( MPU6050_ADDRESS, PWR_MGMT_1, 0b00001000); // Cycle & disable TEMP SENSOR
   writeByte( MPU6050_ADDRESS, PWR_MGMT_2, 0b11000111); // Disable Gyros, 40MHz sample rate
+
+//  writeByte( MPU6050_ADDRESS, CONFIG, 0b00000000 ); // disable filtering for max sensitivity
+  writeByte( MPU6050_ADDRESS, ACCEL_CONFIG, 0b00000000 );
+  writeByte( MPU6050_ADDRESS, ACCEL_CONFIG, 0b00000100 );
+//  writeByte( MPU6050_ADDRESS, PWR_MGMT_1, 0b00101000); // Cycle & disable TEMP SENSOR
+//  writeByte( MPU6050_ADDRESS, PWR_MGMT_2, 0b11000111); // Disable Gyros, 40MHz sample rate
   writeByte( MPU6050_ADDRESS, MOT_THR, 1);  //Write the desired Motion threshold to register 0x1F (For example, write decimal 20).
   writeByte( MPU6050_ADDRESS, MOT_DUR, 1);  //Set motion detect duration to 1  ms; LSB is 1 ms @ 1 kHz rate
-  writeByte( MPU6050_ADDRESS, MOT_DETECT_CTRL, 0b00000101); //to register 0x69, write the motion detection decrement and a few other settings (for example write 0x15 to set both free-fall and motion decrements to 1 and accelerometer start-up delay to 5ms total by adding 1ms. )
+  writeByte( MPU6050_ADDRESS, MOT_DETECT_CTRL, 0b00000000); //to register 0x69, write the motion detection decrement and a few other settings (for example write 0x15 to set both free-fall and motion decrements to 1 and accelerometer start-up delay to 5ms total by adding 1ms. )
   writeByte( MPU6050_ADDRESS, INT_PIN_CFG, 0b00100000 ); // now INT pin is active high, cleared on read
   writeByte( MPU6050_ADDRESS, INT_ENABLE, 0b01000000 ); //write register 0x38, bit 6 (0x40), to enable motion detection interrupt.
   readByte(MPU6050_ADDRESS, INT_STATUS);
 
-  NowMesh.begin(6, true); //Channel = 6, SendOnly = true
-  NowMesh.send("FF:FF:FF:FF:FF:FF", (uint8_t*)"ALARM ACTIVATED", 16);
-  delay(2);
-
-  
 //  Serial.println("SLEEPING");
   WiFi.mode(WIFI_OFF);
   adc_power_off();  // adc power off disables wifi entirely, upstream bug
@@ -113,8 +126,6 @@ void setup(){
   esp_deep_sleep_start();
   
   //unless the deep sleep code above is commented this won't run
-  pinMode(2, OUTPUT);
-  pinMode(0, INPUT);
 
   Serial.printf("0x%02X: %02X\r\n", WHO_AM_I, readByte(MPU6050_ADDRESS, WHO_AM_I));
   Serial.printf("0x%02X: %02X\r\n", INT_ENABLE, readByte(MPU6050_ADDRESS, INT_ENABLE));
